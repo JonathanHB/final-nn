@@ -310,9 +310,9 @@ class NeuralNetwork:
             idx = idx0+1
             #print(":::::::::::")
             #print(self._param_dict["W"+str(idx)])
-            self._param_dict["W"+str(idx)] += grad_dict["dW"+str(idx)]*self._lr
+            self._param_dict["W"+str(idx)] -= grad_dict["dW"+str(idx)]*self._lr
             #print(self._param_dict["W"+str(idx)])
-            self._param_dict["b"+str(idx)] += grad_dict["db"+str(idx)]*self._lr
+            self._param_dict["b"+str(idx)] -= grad_dict["db"+str(idx)]*self._lr
 
 
     def fit(
@@ -463,7 +463,7 @@ class NeuralNetwork:
 
         # compute the binary cross entropy loss function. First term is added for true observations, second term is added for false ones.
         #from hw7
-        bce_loss = -sum([y_hat[x] * np.log(y_hat[x]) + (1 - y_hat[x]) * (np.log(1 - y_hat[x])) for x in range(n)]) / n
+        bce_loss = -sum([y[x] * np.log(y_hat[x]) + (1 - y[x]) * (np.log(1 - y_hat[x])) for x in range(n)]) / n
         return bce_loss
 
     def _binary_cross_entropy_backprop(self, y: ArrayLike, y_hat: ArrayLike) -> ArrayLike:
@@ -484,7 +484,8 @@ class NeuralNetwork:
         # np.matmul(y_hat - y, X)  # / y.shape[0]
         #from hw7
         print("-------------------------------------")
-        print(f"bce_backprop: {[(y_hat[i] - y[i])/(y_hat[i]*(1 - y_hat[i])) for i in range(len(y))]}")
+        #oddly large
+        #print(f"bce_backprop: {[(y_hat[i] - y[i])/(y_hat[i]*(1 - y_hat[i])) for i in range(len(y))]}")
         return [(y_hat[i] - y[i])/(y_hat[i]*(1 - y_hat[i])) for i in range(len(y))]
 
     def _mean_squared_error(self, y: ArrayLike, y_hat: ArrayLike) -> float:
@@ -533,10 +534,10 @@ warnings.filterwarnings("ignore")
 # generate a pair of 2d gaussians and label them and see if the method can distinguish the points
 
 #distributions for classes 0 and 1
-n0 = 500
+n0 = 550
 mean0 = [0,0]
 cov0 = [[1,0],[0,1]]
-n1 = 600
+n1 = 650
 mean1 = [2,3]
 cov1 = [[1,1],[1,.5]]
 #number of input features
@@ -566,7 +567,7 @@ if plot:
     plt.show()
 
 #prepare data and labels for testing
-n_train = 700
+n_train = 600
 x_train = data_labels[0:n_train,0:nf]
 y_train = np.reshape(data_labels[0:n_train,nf], (n_train, 1))
 x_val = data_labels[n_train:,0:nf]
@@ -590,9 +591,25 @@ test_nn = NeuralNetwork(
 
 fit = test_nn.fit(x_train, y_train, x_val, y_val)
 
+print(test_nn._param_dict["W1"])
+print(test_nn._param_dict["b1"])
+print(test_nn._param_dict["W2"])
+print(test_nn._param_dict["b2"])
 
-plt.scatter([i for i in range(len(x_train))], fit[1])
-plt.show
+#plot validation loss
+plt.plot([i for i in range(len(x_train))], fit[1])
+plt.show()
+
+#plt.scatter(x_val[:,0], x_val[:,1], c=y_val)
+#plt.show()
+
+val_pred = test_nn.predict(x_val)
+#plt.scatter(x_val[:,0], x_val[:,1], c=val_pred)
+
+
+plt.hist2d(y_val.flatten(), val_pred.flatten())
+
+plt.show()
 
 #print(test_nn.predict(x_train[0]))
 #print(y_train[0])
