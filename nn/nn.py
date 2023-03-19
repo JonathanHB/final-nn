@@ -152,7 +152,7 @@ class NeuralNetwork:
         last_output = X
 
         #linear and activation matrices for each layer
-        cache = {}
+        cache = {"A0": X}
 
         for idx in range(int(len(self._param_dict)/2)):
             layer = idx + 1
@@ -209,20 +209,44 @@ class NeuralNetwork:
 
         #derivative of the loss function L with respect to the transformed inputs Z
         #dimensions of len(z)
-        dLdZ = activation_dict[activation_curr](dA_curr, Z_curr)
-        print(dLdZ.shape)
-        #^ this equals the derivative of L with respect to the constants b since dZ/db = 1
+        print("dldb")
+
+        #print(dA_curr)
+        #print(Z_curr)
+        #print(b_curr)
+
+        #print(len(dA_curr))
+
+        #'np.array' is used to convert from a list of 1-element arrays to one array
+        dLdZ = np.array(activation_dict[activation_curr](dA_curr, np.transpose(Z_curr)))
+        #print(dLdZ)
+        #print(np.array(dLdZ))
+        #^ this equals the derivative of L with respect to the constants b (dL/db) since dZ/db = 1
+
+        #print("dlda")
+
+        #print(np.transpose(W_curr))
+        #print(dLdZ)
 
         #derivative of the loss function with respect to the inputs A_in
         #dimensions of len(A_in)
-        dLdA_in = np.matmul(dLdZ, np.transpose(W_curr))
-        print(dLdA_in.shape)
+        dLdA_in = np.matmul(np.transpose(W_curr), dLdZ)
+        #print(dLdA_in)
+        #print(dA_curr)
 
+        print("dldw")
 
+        #print(np.transpose(dLdZ))
+        #print(A_prev)
 
-        return (dLdA_in,  dLdZ)
+        #mathematically I believe this should be the transpose of dL/dZ, but it comes pre-transposed here due to quirks
+        # of how my numpy matrices are oriented
+        dLdW = np.matmul(dLdZ, A_prev)
+        #print(W_curr.shape)
+        #print(dLdW.shape)
 
-        pass
+        return (dLdA_in, dLdW, dLdZ)
+
 
     def backprop(self, y: ArrayLike, y_hat: ArrayLike, cache: Dict[str, ArrayLike]):
 
@@ -253,9 +277,19 @@ class NeuralNetwork:
         for idx in range(nlayers):
             invidx = nlayers-idx-1
 
+            backprop_s = self._single_backprop(
+                W_curr = self._param_dict['W' + str(invidx+1)],
+                b_curr = self._param_dict['b' + str(invidx+1)],
+                Z_curr = cache["Z" + str(invidx+1)],
+                #case to compare to inputs (or add a dummy entry to cache containing the inputs)
+                A_prev = cache["A" + str(invidx)],
+                dA_curr = dLdA_out,
+                activation_curr = self.arch[invidx]["activation"])
 
+            grad_dict["dW"+str(invidx)] = backprop_s[1]
+            grad_dict["db"+str(invidx)] = backprop_s[2]
 
-            dLdA_out =
+            dLdA_out = backprop_s[0]
 
 
         pass
@@ -303,8 +337,6 @@ class NeuralNetwork:
         per_obs_loss_val = []
 
         for i, xtr in enumerate(X_train):
-            print("aaaaaaa")
-            print(xtr)
             print(i)
             #if i == 1:
             #    import sys
@@ -441,7 +473,7 @@ class NeuralNetwork:
         # dividing by y.shape[0] should make the learning rate choice less sensitive to batch size
         # np.matmul(y_hat - y, X)  # / y.shape[0]
         #from hw7
-        return (y_hat - y)/(y_hat*(1 - y_hat))
+        return [(y_hat[i] - y[i])/(y_hat[i]*(1 - y_hat[i])) for i in range(len(y))]
 
     def _mean_squared_error(self, y: ArrayLike, y_hat: ArrayLike) -> float:
         """
