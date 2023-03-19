@@ -154,10 +154,10 @@ class NeuralNetwork:
         #linear and activation matrices for each layer
         cache = {"A0": X}
 
-        for idx in range(int(len(self._param_dict)/2)):
+        for idx in range(len(self.arch)):
             layer = idx + 1
             #feed the output of the previous layer through the current layer
-            print(self.arch[idx])
+            #print(self.arch[idx])
             single_layer_pass = self._single_forward(self._param_dict["W"+str(layer)], self._param_dict["b"+str(layer)], last_output, self.arch[idx]['activation'])
             #store the output of the current layer to be fed into the next layer
             last_output = single_layer_pass[0]
@@ -203,13 +203,13 @@ class NeuralNetwork:
                 Partial derivative of loss function with respect to current layer bias matrix.
         """
 
-        activation_dict = {"sigmoid":self._sigmoid_backprop}
+        backprop_dict = {"sigmoid":self._sigmoid_backprop}
 
         ###dL/dA_prev = dL/dA_curr * dA_curr/dA_prev = (dL/dA_curr * dA_curr/dZ_curr) * dZ_curr/dA_prev
 
         #derivative of the loss function L with respect to the transformed inputs Z
         #dimensions of len(z)
-        print("dldb")
+        #print("dldb")
 
         #print(dA_curr)
         #print(Z_curr)
@@ -218,7 +218,7 @@ class NeuralNetwork:
         #print(len(dA_curr))
 
         #'np.array' is used to convert from a list of 1-element arrays to one array
-        dLdZ = np.array(activation_dict[activation_curr](dA_curr, np.transpose(Z_curr)))
+        dLdZ = np.array(backprop_dict[activation_curr](dA_curr, np.transpose(Z_curr)))
         #print(dLdZ)
         #print(np.array(dLdZ))
         #^ this equals the derivative of L with respect to the constants b (dL/db) since dZ/db = 1
@@ -234,7 +234,7 @@ class NeuralNetwork:
         #print(dLdA_in)
         #print(dA_curr)
 
-        print("dldw")
+        #print("dldw")
 
         #print(np.transpose(dLdZ))
         #print(A_prev)
@@ -272,6 +272,8 @@ class NeuralNetwork:
         grad_dict = {}
 
         #derivative of the loss with respect to the activation output
+        #print(y)
+        #print(y_hat)
         dLdA_out = self._binary_cross_entropy_backprop(y, y_hat)
 
         for idx in range(nlayers):
@@ -286,13 +288,13 @@ class NeuralNetwork:
                 dA_curr = dLdA_out,
                 activation_curr = self.arch[invidx]["activation"])
 
-            grad_dict["dW"+str(invidx)] = backprop_s[1]
-            grad_dict["db"+str(invidx)] = backprop_s[2]
+            grad_dict["dW"+str(invidx+1)] = backprop_s[1]
+            grad_dict["db"+str(invidx+1)] = backprop_s[2]
 
             dLdA_out = backprop_s[0]
 
-
-        pass
+        #print(grad_dict)
+        return grad_dict
 
     def _update_params(self, grad_dict: Dict[str, ArrayLike]):
         """
@@ -303,7 +305,15 @@ class NeuralNetwork:
             grad_dict: Dict[str, ArrayLike]
                 Dictionary containing the gradient information from most recent round of backprop.
         """
-        pass
+
+        for idx0 in range(len(self.arch)):
+            idx = idx0+1
+            #print(":::::::::::")
+            #print(self._param_dict["W"+str(idx)])
+            self._param_dict["W"+str(idx)] += grad_dict["dW"+str(idx)]*self._lr
+            #print(self._param_dict["W"+str(idx)])
+            self._param_dict["b"+str(idx)] += grad_dict["db"+str(idx)]*self._lr
+
 
     def fit(
         self,
@@ -338,9 +348,8 @@ class NeuralNetwork:
 
         for i, xtr in enumerate(X_train):
             print(i)
-            #if i == 1:
-            #    import sys
-            #    sys.exit(0)
+            #if i == 40:
+            #    break
 
             #predict from the current observation
             fpass = self.forward(xtr)
@@ -354,6 +363,7 @@ class NeuralNetwork:
             #compute validation loss
             per_obs_loss_val.append(self._binary_cross_entropy(y_val, self.predict(X_val)))
 
+        return (np.array(per_obs_loss_train).flatten(), np.array(per_obs_loss_val).flatten())
 
 
     def predict(self, X: ArrayLike) -> ArrayLike:
@@ -403,7 +413,7 @@ class NeuralNetwork:
                 Partial derivative of current layer Z matrix.
         """
 
-        return [dA[i]*np.exp(-Z[i])/(1+np.exp(-Z[i]))**-2 for i in range(len(dA))]
+        return [dA[i]*np.exp(-Z[i])*(1+np.exp(-Z[i]))**-2 for i in range(len(dA))]
 
     def _relu(self, Z: ArrayLike) -> ArrayLike:
         """
@@ -473,6 +483,8 @@ class NeuralNetwork:
         # dividing by y.shape[0] should make the learning rate choice less sensitive to batch size
         # np.matmul(y_hat - y, X)  # / y.shape[0]
         #from hw7
+        print("-------------------------------------")
+        print(f"bce_backprop: {[(y_hat[i] - y[i])/(y_hat[i]*(1 - y_hat[i])) for i in range(len(y))]}")
         return [(y_hat[i] - y[i])/(y_hat[i]*(1 - y_hat[i])) for i in range(len(y))]
 
     def _mean_squared_error(self, y: ArrayLike, y_hat: ArrayLike) -> float:
@@ -576,9 +588,11 @@ test_nn = NeuralNetwork(
     loss_function="sigmoid"
     )
 
-test_nn.fit(x_train, y_train, x_val, y_val)
+fit = test_nn.fit(x_train, y_train, x_val, y_val)
 
 
+plt.scatter([i for i in range(len(x_train))], fit[1])
+plt.show
 
 #print(test_nn.predict(x_train[0]))
 #print(y_train[0])
