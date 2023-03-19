@@ -110,20 +110,10 @@ class NeuralNetwork:
         # dictionary of activation functions without leading underscores
         activation_dict = {"sigmoid":self._sigmoid}
 
-        #print("matmul shapes:")
-        #print(W_curr.shape)
-        #print(A_prev.shape)
-        #print(b_curr.shape)
-
-        # print(W_curr)
-        # print(A_prev)
-        # print(np.matmul(W_curr, np.transpose(A_prev)))
-        # print(np.tile(b_curr, A_prev.shape[0]))
-
         #linear transform of the inputs
         Z_curr = np.transpose(np.matmul(W_curr, np.transpose(A_prev)) + np.tile(b_curr, A_prev.shape[0]))
 
-        #feed proto-outputs through activation function
+        #feed transformed inputs through activation function
         A_curr = np.array([activation_dict[activation](i) for i in Z_curr])
 
         return (A_curr, Z_curr)
@@ -144,6 +134,7 @@ class NeuralNetwork:
         """
 
         #fix list formatting; adding matrices will not work otherwise
+        #this is needed only for single vector inputs
         if len(X.shape) == 1:
             X = np.reshape(X, (1, X.shape[0]))
 
@@ -157,11 +148,10 @@ class NeuralNetwork:
         for idx in range(len(self.arch)):
             layer = idx + 1
             #feed the output of the previous layer through the current layer
-            #print(self.arch[idx])
             single_layer_pass = self._single_forward(self._param_dict["W"+str(layer)], self._param_dict["b"+str(layer)], last_output, self.arch[idx]['activation'])
             #store the output of the current layer to be fed into the next layer
             last_output = single_layer_pass[0]
-            #add entries to the dictionary
+            #add entries to the dictionary; used in backpropagation
             cache["A" + str(layer)] = single_layer_pass[0]
             cache["Z" + str(layer)] = single_layer_pass[1]
 
@@ -203,47 +193,25 @@ class NeuralNetwork:
                 Partial derivative of loss function with respect to current layer bias matrix.
         """
 
+        #b_curr seems to be unused
+
         backprop_dict = {"sigmoid":self._sigmoid_backprop}
 
-        ###dL/dA_prev = dL/dA_curr * dA_curr/dA_prev = (dL/dA_curr * dA_curr/dZ_curr) * dZ_curr/dA_prev
-
         #derivative of the loss function L with respect to the transformed inputs Z
-        #dimensions of len(z)
-        #print("dldb")
-
-        #print(dA_curr)
-        #print(Z_curr)
-        #print(b_curr)
-
-        #print(len(dA_curr))
-
+        #dimensions of len(z) (1d vector)
+        #this equals the derivative of L with respect to the constants b (dL/db) since dZ/db = 1
         #'np.array' is used to convert from a list of 1-element arrays to one array
         dLdZ = np.array(backprop_dict[activation_curr](dA_curr, np.transpose(Z_curr)))
-        #print(dLdZ)
-        #print(np.array(dLdZ))
-        #^ this equals the derivative of L with respect to the constants b (dL/db) since dZ/db = 1
 
-        #print("dlda")
-
-        #print(np.transpose(W_curr))
-        #print(dLdZ)
-
-        #derivative of the loss function with respect to the inputs A_in
-        #dimensions of len(A_in)
+        #derivative of the loss function with respect to the input A_in
+        #dimensions of len(A_in) (1d vector)
         dLdA_in = np.matmul(np.transpose(W_curr), dLdZ)
-        #print(dLdA_in)
-        #print(dA_curr)
-
-        #print("dldw")
-
-        #print(np.transpose(dLdZ))
-        #print(A_prev)
 
         #mathematically I believe this should be the transpose of dL/dZ, but it comes pre-transposed here due to quirks
         # of how my numpy matrices are oriented
+        #dimensions of shape(W) (2d matrix)
         dLdW = np.matmul(dLdZ, A_prev)
-        #print(W_curr.shape)
-        #print(dLdW.shape)
+
 
         return (dLdA_in, dLdW, dLdZ)
 
@@ -269,11 +237,13 @@ class NeuralNetwork:
 
         nlayers = len(self.arch)
 
+        #store the gradients with respect to the weights in each layer for gradient descent
         grad_dict = {}
 
-        #derivative of the loss with respect to the activation output
-        #print(y)
-        #print(y_hat)
+        #Initialized to the derivative of the loss with respect to the final prediction
+        # this is the initial derivative from which backpropagation begins
+        #This subsequently stores the derivative of the loss with respect to the input of each layer,
+        # which is equal to the derivative of the loss with respect to the output of the layer above
         dLdA_out = self._binary_cross_entropy_backprop(y, y_hat)
 
         for idx in range(nlayers):
@@ -283,7 +253,6 @@ class NeuralNetwork:
                 W_curr = self._param_dict['W' + str(invidx+1)],
                 b_curr = self._param_dict['b' + str(invidx+1)],
                 Z_curr = cache["Z" + str(invidx+1)],
-                #case to compare to inputs (or add a dummy entry to cache containing the inputs)
                 A_prev = cache["A" + str(invidx)],
                 dA_curr = dLdA_out,
                 activation_curr = self.arch[invidx]["activation"])
@@ -293,7 +262,6 @@ class NeuralNetwork:
 
             dLdA_out = backprop_s[0]
 
-        #print(grad_dict)
         return grad_dict
 
     def _update_params(self, grad_dict: Dict[str, ArrayLike]):
@@ -306,12 +274,11 @@ class NeuralNetwork:
                 Dictionary containing the gradient information from most recent round of backprop.
         """
 
+        #for each layer of the neural network, subtract the gradients of the loss function with respect to W and b
+        # from W and b respectively to perform gradient descent
         for idx0 in range(len(self.arch)):
             idx = idx0+1
-            #print(":::::::::::")
-            #print(self._param_dict["W"+str(idx)])
             self._param_dict["W"+str(idx)] -= grad_dict["dW"+str(idx)]*self._lr
-            #print(self._param_dict["W"+str(idx)])
             self._param_dict["b"+str(idx)] -= grad_dict["db"+str(idx)]*self._lr
 
 
@@ -343,13 +310,12 @@ class NeuralNetwork:
                 List of per epoch loss for validation set.
         """
 
+        #training and validation losses for each observation
         per_obs_loss_train = []
         per_obs_loss_val = []
 
+        #loop over all training examples
         for i, xtr in enumerate(X_train):
-            print(i)
-            #if i == 40:
-            #    break
 
             #predict from the current observation
             fpass = self.forward(xtr)
@@ -360,7 +326,7 @@ class NeuralNetwork:
             grad = self.backprop(y_train[i], fpass[0], fpass[1])
             self._update_params(grad)
 
-            #compute validation loss
+            #compute validation loss using the updated weights
             per_obs_loss_val.append(self._binary_cross_entropy(y_val, self.predict(X_val)))
 
         return (np.array(per_obs_loss_train).flatten(), np.array(per_obs_loss_val).flatten())
@@ -395,6 +361,7 @@ class NeuralNetwork:
                 Activation function output.
         """
         #using a logistic sigmoid function
+        #the logistic function is applied elementwise to z
         return [1/(1+np.exp(-i)) for i in Z]
 
 
@@ -412,7 +379,10 @@ class NeuralNetwork:
             dZ: ArrayLike
                 Partial derivative of current layer Z matrix.
         """
-
+        #elementwise product of (the gradient of the logistic curve with respect to z) and
+        # (the derivatives of the loss function with respect to the logistic curve values A)
+        # [where A is the vector obtained by applying the logistic curve elementwise to z]
+        # dL/dz = dL/dA o dA/dz             ['o' is the elementwise product]
         return [dA[i]*np.exp(-Z[i])*(1+np.exp(-Z[i]))**-2 for i in range(len(dA))]
 
     def _relu(self, Z: ArrayLike) -> ArrayLike:
@@ -462,7 +432,6 @@ class NeuralNetwork:
         n = y.shape[0]
 
         # compute the binary cross entropy loss function. First term is added for true observations, second term is added for false ones.
-        #from hw7
         bce_loss = -sum([y[x] * np.log(y_hat[x]) + (1 - y[x]) * (np.log(1 - y_hat[x])) for x in range(n)]) / n
         return bce_loss
 
@@ -480,12 +449,10 @@ class NeuralNetwork:
             dA: ArrayLike
                 partial derivative of loss with respect to y_hat.
         """
-        # dividing by y.shape[0] should make the learning rate choice less sensitive to batch size
-        # np.matmul(y_hat - y, X)  # / y.shape[0]
-        #from hw7
-        print("-------------------------------------")
-        #oddly large
-        #print(f"bce_backprop: {[(y_hat[i] - y[i])/(y_hat[i]*(1 - y_hat[i])) for i in range(len(y))]}")
+        #Note that this is the bce loss derivative with respect to y_hat,
+        # not with respect to the weights W used to calculate y_hat.
+        #Beware that these may be very large where y_hat is near 0 or 1.
+        # As far as I can tell this is a natural property of the BCE function.
         return [(y_hat[i] - y[i])/(y_hat[i]*(1 - y_hat[i])) for i in range(len(y))]
 
     def _mean_squared_error(self, y: ArrayLike, y_hat: ArrayLike) -> float:
@@ -573,10 +540,10 @@ y_train = np.reshape(data_labels[0:n_train,nf], (n_train, 1))
 x_val = data_labels[n_train:,0:nf]
 y_val = np.reshape(data_labels[n_train:,nf], (n0+n1-n_train, 1))
 
-print(x_train.shape)
-print(y_train.shape)
-print(x_val.shape)
-print(y_val.shape)
+# print(x_train.shape)
+# print(y_train.shape)
+# print(x_val.shape)
+# print(y_val.shape)
 
 #----------------------------------------------
 #initialize neural network
@@ -591,34 +558,21 @@ test_nn = NeuralNetwork(
 
 fit = test_nn.fit(x_train, y_train, x_val, y_val)
 
-print(test_nn._param_dict["W1"])
-print(test_nn._param_dict["b1"])
-print(test_nn._param_dict["W2"])
-print(test_nn._param_dict["b2"])
+#print(test_nn._param_dict["W1"])
+#print(test_nn._param_dict["b1"])
+#print(test_nn._param_dict["W2"])
+#print(test_nn._param_dict["b2"])
 
 #plot validation loss
 plt.plot([i for i in range(len(x_train))], fit[1])
 plt.show()
 
-#plt.scatter(x_val[:,0], x_val[:,1], c=y_val)
-#plt.show()
-
-val_pred = test_nn.predict(x_val)
-#plt.scatter(x_val[:,0], x_val[:,1], c=val_pred)
-
-
-plt.hist2d(y_val.flatten(), val_pred.flatten())
-
+plt.scatter(x_val[:,0], x_val[:,1], c=y_val)
 plt.show()
 
-#print(test_nn.predict(x_train[0]))
-#print(y_train[0])
-#print("bce")
-#print(test_nn._binary_cross_entropy(y_train[0], test_nn.predict(x_train[0])))
+val_pred = test_nn.predict(x_val)
+plt.scatter(x_val[:,0], x_val[:,1], c=val_pred)
+plt.show()
 
-#trimmings
-# print(f"z curr shape: {Z_curr.shape}")
-# print(f"w curr shape: {W_curr.shape}")
-# print(f"a prev shape: {A_prev.shape}")
-# print(f"b curr shape: {b_curr.shape}")
-# print(np.matmul(W_curr, A_prev).shape)
+plt.hist2d(y_val.flatten(), val_pred.flatten())
+plt.show()
