@@ -52,6 +52,14 @@ class NeuralNetwork:
         # Initialize the parameter dictionary for use in training
         self._param_dict = self._init_params()
 
+        #initialize a dictionary of the activation and loss functions and their gradients
+        # dictionary of activation functions without leading underscores
+        self._activation_dict = {"sigmoid":self._sigmoid, "relu":self._relu}
+        self._activation_backprop_dict = {"sigmoid":self._sigmoid_backprop, "relu":self._relu_backprop}
+        self._loss_dict = {"bce":self._binary_cross_entropy, "mse":self._mean_squared_error}
+        self._loss_backprop_dict = {"bce":self._binary_cross_entropy_backprop, "mse":self._mean_squared_error_backprop}
+
+
     def _init_params(self) -> Dict[str, ArrayLike]:
         """
         DO NOT MODIFY THIS METHOD! IT IS ALREADY COMPLETE!
@@ -107,14 +115,12 @@ class NeuralNetwork:
             Z_curr: ArrayLike
                 Current layer linear transformed matrix.
         """
-        # dictionary of activation functions without leading underscores
-        activation_dict = {"sigmoid":self._sigmoid}
 
         #linear transform of the inputs
         Z_curr = np.transpose(np.matmul(W_curr, np.transpose(A_prev)) + np.tile(b_curr, A_prev.shape[0]))
 
         #feed transformed inputs through activation function
-        A_curr = np.array([activation_dict[activation](i) for i in Z_curr])
+        A_curr = np.array([self._activation_dict[activation](i) for i in Z_curr])
 
         return (A_curr, Z_curr)
 
@@ -143,6 +149,7 @@ class NeuralNetwork:
         last_output = X
 
         #linear and activation matrices for each layer
+        #add the inputs at the first element since the final gradient is taken with respect to them
         cache = {"A0": X}
 
         for idx in range(len(self.arch)):
@@ -195,19 +202,17 @@ class NeuralNetwork:
 
         #b_curr seems to be unused
 
-        backprop_dict = {"sigmoid":self._sigmoid_backprop}
-
         #derivative of the loss function L with respect to the transformed inputs Z
         #dimensions of len(z) (1d vector)
         #this equals the derivative of L with respect to the constants b (dL/db) since dZ/db = 1
         #'np.array' is used to convert from a list of 1-element arrays to one array
-        dLdZ = np.array(backprop_dict[activation_curr](dA_curr, np.transpose(Z_curr)))
+        dLdZ = np.array(self._activation_backprop_dict[activation_curr](dA_curr, np.transpose(Z_curr)))
 
         #derivative of the loss function with respect to the input A_in
         #dimensions of len(A_in) (1d vector)
         dLdA_in = np.matmul(np.transpose(W_curr), dLdZ)
 
-        #mathematically I believe this should be the transpose of dL/dZ, but it comes pre-transposed here due to quirks
+        #mathematically I believe this should use the transpose of dL/dZ, but it comes pre-transposed here due to quirks
         # of how my numpy matrices are oriented
         #dimensions of shape(W) (2d matrix)
         dLdW = np.matmul(dLdZ, A_prev)
@@ -244,7 +249,7 @@ class NeuralNetwork:
         # this is the initial derivative from which backpropagation begins
         #This subsequently stores the derivative of the loss with respect to the input of each layer,
         # which is equal to the derivative of the loss with respect to the output of the layer above
-        dLdA_out = self._binary_cross_entropy_backprop(y, y_hat)
+        dLdA_out = self._loss_backprop_dict[self._loss_func](y, y_hat)
 
         for idx in range(nlayers):
             invidx = nlayers-idx-1
@@ -320,14 +325,14 @@ class NeuralNetwork:
             #predict from the current observation
             fpass = self.forward(xtr)
             #calculate the training loss
-            per_obs_loss_train.append(self._binary_cross_entropy(y_train[i], fpass[0]))
+            per_obs_loss_train.append(self._loss_dict[self._loss_func](y_train[i], fpass[0]))
 
             #calculate the gradient and update the weights
             grad = self.backprop(y_train[i], fpass[0], fpass[1])
             self._update_params(grad)
 
             #compute validation loss using the updated weights
-            per_obs_loss_val.append(self._binary_cross_entropy(y_val, self.predict(X_val)))
+            per_obs_loss_val.append(self._loss_dict[self._loss_func](y_val, self.predict(X_val)))
 
         return (np.array(per_obs_loss_train).flatten(), np.array(per_obs_loss_val).flatten())
 
@@ -469,7 +474,8 @@ class NeuralNetwork:
             loss: float
                 Average loss of mini-batch.
         """
-        pass
+        n = len(y)
+        return np.sum([(y_hat[i]-y[i])**2 for i in range(n)])/n
 
     def _mean_squared_error_backprop(self, y: ArrayLike, y_hat: ArrayLike) -> ArrayLike:
         """
@@ -485,7 +491,8 @@ class NeuralNetwork:
             dA: ArrayLike
                 partial derivative of loss with respect to A matrix.
         """
-        pass
+        n = len(y)
+        return [2*(y_hat[i] - y[i]) for i in range(n)]
 
 
 #---------------------------------------------------------------------------
@@ -549,11 +556,11 @@ y_val = np.reshape(data_labels[n_train:,nf], (n0+n1-n_train, 1))
 #initialize neural network
 test_nn = NeuralNetwork(
     [{'input_dim': nf, 'output_dim': 2, 'activation': 'sigmoid'}, {'input_dim': 2, 'output_dim': 1, 'activation': 'sigmoid'}],
-    lr=.1,
+    lr=.5,
     seed=0,
     batch_size=10,
     epochs=10,
-    loss_function="sigmoid"
+    loss_function="bce"
     )
 
 fit = test_nn.fit(x_train, y_train, x_val, y_val)
