@@ -402,7 +402,8 @@ class NeuralNetwork:
             nl_transform: ArrayLike
                 Activation function output.
         """
-        pass
+        #print([zi if zi >= 0 else 0 for zi in Z])
+        return [zi if zi >= 0 else 0 for zi in Z]
 
     def _relu_backprop(self, dA: ArrayLike, Z: ArrayLike) -> ArrayLike:
         """
@@ -418,7 +419,8 @@ class NeuralNetwork:
             dZ: ArrayLike
                 Partial derivative of current layer Z matrix.
         """
-        pass
+        #the index of 0 on dA is to get rid of useless internal arrays
+        return np.reshape([dA[i][0] if Z[i] >= 0 else 0.0 for i in range(len(Z))], (len(Z),1))
 
     def _binary_cross_entropy(self, y: ArrayLike, y_hat: ArrayLike) -> float:
         """
@@ -555,12 +557,12 @@ y_val = np.reshape(data_labels[n_train:,nf], (n0+n1-n_train, 1))
 #----------------------------------------------
 #initialize neural network
 test_nn = NeuralNetwork(
-    [{'input_dim': nf, 'output_dim': 2, 'activation': 'sigmoid'}, {'input_dim': 2, 'output_dim': 1, 'activation': 'sigmoid'}],
-    lr=.5,
+    [{'input_dim': nf, 'output_dim': 2, 'activation': 'relu'}, {'input_dim': 2, 'output_dim': 1, 'activation': 'sigmoid'}],
+    lr=.1,
     seed=0,
     batch_size=10,
     epochs=10,
-    loss_function="bce"
+    loss_function="mse"
     )
 
 fit = test_nn.fit(x_train, y_train, x_val, y_val)
@@ -581,5 +583,5 @@ val_pred = test_nn.predict(x_val)
 plt.scatter(x_val[:,0], x_val[:,1], c=val_pred)
 plt.show()
 
-plt.hist2d(y_val.flatten(), val_pred.flatten())
+plt.hist2d(y_val.flatten(), val_pred.flatten(), bins=(2,10))
 plt.show()
