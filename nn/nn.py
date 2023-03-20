@@ -319,6 +319,13 @@ class NeuralNetwork:
         per_obs_loss_train = []
         per_obs_loss_val = []
 
+        #training and validation losses for each epoch
+        per_epoch_loss_train = []
+        per_epoch_loss_val = []
+
+        #grad dicts for each observation in a batch
+        grad_dicts = []
+
         #loop over all training examples
         for i, xtr in enumerate(X_train):
 
@@ -328,11 +335,18 @@ class NeuralNetwork:
             per_obs_loss_train.append(self._loss_dict[self._loss_func](y_train[i], fpass[0]))
 
             #calculate the gradient and update the weights
-            grad = self.backprop(y_train[i], fpass[0], fpass[1])
-            self._update_params(grad)
+            grad_dicts.append(self.backprop(y_train[i], fpass[0], fpass[1]))
 
             #compute validation loss using the updated weights
             per_obs_loss_val.append(self._loss_dict[self._loss_func](y_val, self.predict(X_val)))
+
+            #when the batch is done, update the parameters and reset the list of grad_dicts used to update them
+            if i!= 0 and i%self._batch_size == 0:
+                for grad_dict in grad_dicts:
+                    self._update_params(grad_dict)
+                grad_dicts = []
+
+
 
         return (np.array(per_obs_loss_train).flatten(), np.array(per_obs_loss_val).flatten())
 
