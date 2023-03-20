@@ -20,7 +20,45 @@ def sample_seqs(seqs: List[str], labels: List[bool]) -> Tuple[List[str], List[bo
         sampled_labels: List[bool]
             List of labels for the sampled sequences
     """
-    pass
+
+    #actual true label fraction
+    #truelabel_frac = np.sum(labels)/nlabels
+    #print(truelabel_frac)
+
+    nlabels = len(labels)
+
+    #separate seqs by label
+    seqs_pos = []
+    seqs_neg = []
+
+    for x, seq in enumerate(seqs):
+        if labels[x]:
+            seqs_pos.append(seq)
+        else:
+            seqs_neg.append(seq)
+
+    #randomly draw a sample consisting of 50% positive and 50% negative examples
+    seqs_labels_out = []
+
+    for x in range(nlabels):
+        if x%2 == 0:
+            seqs_labels_out.append([seqs_neg[np.random.randint(0,len(seqs_neg))],0])
+        else:
+            seqs_labels_out.append([seqs_pos[np.random.randint(0,len(seqs_pos))],1])
+
+    #shuffle the order of the entries
+    np.random.shuffle(seqs_labels_out)
+
+    return ([i[0] for i in seqs_labels_out], [i[1] for i in seqs_labels_out])
+
+
+test_sample_seqs = False
+
+if test_sample_seqs:
+    test_str = ["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p"]
+    test_labels = [True, False, True, False, True, False, False, False, True, False, True, False, False, False, False, False]
+    print(sample_seqs(test_str, test_labels))
+
 
 def one_hot_encode_seqs(seq_arr: List[str]) -> ArrayLike:
     """
@@ -41,4 +79,10 @@ def one_hot_encode_seqs(seq_arr: List[str]) -> ArrayLike:
                 G -> [0, 0, 0, 1]
             Then, AGA -> [1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0].
     """
-    pass
+    onehot_dict = {
+    "A":[1, 0, 0, 0],
+    "T":[0, 1, 0, 0],
+    "C":[0, 0, 1, 0],
+    "G":[0, 0, 0, 1]}
+
+    return [np.concatenate([onehot_dict[i.upper()] for i in seq]) for seq in seq_arr]

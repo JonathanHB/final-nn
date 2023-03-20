@@ -521,87 +521,95 @@ class NeuralNetwork:
 #--------------------------------  testing  --------------------------------
 #---------------------------------------------------------------------------
 
-import matplotlib.pyplot as plt
-import warnings
-warnings.filterwarnings("ignore")
+run_internal_nn_test = False
 
-#----------------------------------------------
-# generate data
-# generate a pair of 2d gaussians and label them and see if the method can distinguish the points
+if run_internal_nn_test:
 
-#distributions for classes 0 and 1
-n0 = 550
-mean0 = [0,0]
-cov0 = [[1,0],[0,1]]
-n1 = 650
-mean1 = [2,3]
-cov1 = [[1,1],[1,.5]]
-#number of input features
-nf = len(mean1)
+    import matplotlib.pyplot as plt
+    import warnings
+    warnings.filterwarnings("ignore")
 
-#generate data and labels
-#ignore the error about positive semidefiniteness
-d0 = np.random.multivariate_normal(mean0, cov0, n0)
-d1 = np.random.multivariate_normal(mean1, cov1, n1)
+    #----------------------------------------------
+    # generate data
+    # generate a pair of 2d gaussians and label them and see if the method can distinguish the points
 
-#combine the data points
-data = np.concatenate((d0,d1))
+    #distributions for classes 0 and 1
+    n0 = 550
+    mean0 = [0,0]
+    cov0 = [[1,0],[0,1]]
+    n1 = 650
+    mean1 = [2,3]
+    cov1 = [[1,1],[1,.5]]
+    #number of input features
+    nf = len(mean1)
 
-#label each gaussian and combine the labels
-labels = np.reshape(np.concatenate((np.zeros(n0),np.ones(n1))), (n0+n1,1))
+    #generate data and labels
+    #ignore the error about positive semidefiniteness
+    d0 = np.random.multivariate_normal(mean0, cov0, n0)
+    d1 = np.random.multivariate_normal(mean1, cov1, n1)
 
-#combine data points and their labels
-data_labels = np.concatenate((data,labels), axis=1)
+    #combine the data points
+    data = np.concatenate((d0,d1))
 
-#shuffle combined data and labels before use
-np.random.shuffle(data_labels)
+    #label each gaussian and combine the labels
+    labels = np.reshape(np.concatenate((np.zeros(n0),np.ones(n1))), (n0+n1,1))
 
-#plot the data
-plot = False
-if plot:
-    plt.scatter(data_labels[:,0], data_labels[:,1], c=data_labels[:,2])
+    #combine data points and their labels
+    data_labels = np.concatenate((data,labels), axis=1)
+
+    #shuffle combined data and labels before use
+    np.random.shuffle(data_labels)
+
+    #plot the data
+    plot = False
+    if plot:
+        plt.scatter(data_labels[:,0], data_labels[:,1], c=data_labels[:,2])
+        plt.show()
+
+    #prepare data and labels for testing
+    n_train = 600
+    x_train = data_labels[0:n_train,0:nf]
+    y_train = np.reshape(data_labels[0:n_train,nf], (n_train, 1))
+    x_val = data_labels[n_train:,0:nf]
+    y_val = np.reshape(data_labels[n_train:,nf], (n0+n1-n_train, 1))
+
+    # print(x_train.shape)
+    # print(y_train.shape)
+    # print(x_val.shape)
+    # print(y_val.shape)
+
+    #----------------------------------------------
+    #initialize neural network
+    test_nn = NeuralNetwork(
+        [{'input_dim': nf, 'output_dim': 2, 'activation': 'relu'}, {'input_dim': 2, 'output_dim': 1, 'activation': 'sigmoid'}],
+        lr=.1,
+        seed=0,
+        batch_size=10,
+        epochs=10,
+        loss_function="mse"
+        )
+
+    fit = test_nn.fit(x_train, y_train, x_val, y_val)
+
+    #print(test_nn._param_dict["W1"])
+    #print(test_nn._param_dict["b1"])
+    #print(test_nn._param_dict["W2"])
+    #print(test_nn._param_dict["b2"])
+
+    #plot validation loss
+    plt.plot([i for i in range(len(fit[1]))], fit[1])
     plt.show()
 
-#prepare data and labels for testing
-n_train = 600
-x_train = data_labels[0:n_train,0:nf]
-y_train = np.reshape(data_labels[0:n_train,nf], (n_train, 1))
-x_val = data_labels[n_train:,0:nf]
-y_val = np.reshape(data_labels[n_train:,nf], (n0+n1-n_train, 1))
+    plt.scatter(x_val[:,0], x_val[:,1], c=y_val)
+    plt.show()
 
-# print(x_train.shape)
-# print(y_train.shape)
-# print(x_val.shape)
-# print(y_val.shape)
+    val_pred = test_nn.predict(x_val)
+    plt.scatter(x_val[:,0], x_val[:,1], c=val_pred)
+    plt.show()
 
-#----------------------------------------------
-#initialize neural network
-test_nn = NeuralNetwork(
-    [{'input_dim': nf, 'output_dim': 2, 'activation': 'relu'}, {'input_dim': 2, 'output_dim': 1, 'activation': 'sigmoid'}],
-    lr=.1,
-    seed=0,
-    batch_size=10,
-    epochs=10,
-    loss_function="mse"
-    )
+    plt.hist2d(y_val.flatten(), val_pred.flatten(), bins=(2,10))
+    plt.show()
 
-fit = test_nn.fit(x_train, y_train, x_val, y_val)
 
-#print(test_nn._param_dict["W1"])
-#print(test_nn._param_dict["b1"])
-#print(test_nn._param_dict["W2"])
-#print(test_nn._param_dict["b2"])
-
-#plot validation loss
-plt.plot([i for i in range(len(fit[1]))], fit[1])
-plt.show()
-
-plt.scatter(x_val[:,0], x_val[:,1], c=y_val)
-plt.show()
-
-val_pred = test_nn.predict(x_val)
-plt.scatter(x_val[:,0], x_val[:,1], c=val_pred)
-plt.show()
-
-plt.hist2d(y_val.flatten(), val_pred.flatten(), bins=(2,10))
-plt.show()
+else:
+    print("skipping internal nn test")
