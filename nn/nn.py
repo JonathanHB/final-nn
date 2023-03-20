@@ -315,40 +315,46 @@ class NeuralNetwork:
                 List of per epoch loss for validation set.
         """
 
-        #training and validation losses for each observation
-        per_obs_loss_train = []
-        per_obs_loss_val = []
-
         #training and validation losses for each epoch
         per_epoch_loss_train = []
         per_epoch_loss_val = []
 
-        #grad dicts for each observation in a batch
-        grad_dicts = []
+        #loop over all the epochs
+        for epochx in range(self._epochs):
 
-        #loop over all training examples
-        for i, xtr in enumerate(X_train):
+            # training and validation losses for each observation
+            per_obs_loss_train = []
+            per_obs_loss_val = []
 
-            #predict from the current observation
-            fpass = self.forward(xtr)
-            #calculate the training loss
-            per_obs_loss_train.append(self._loss_dict[self._loss_func](y_train[i], fpass[0]))
+            #grad dicts for each observation in a batch
+            grad_dicts = []
 
-            #calculate the gradient and update the weights
-            grad_dicts.append(self.backprop(y_train[i], fpass[0], fpass[1]))
+            #loop over all training examples
+            for i, xtr in enumerate(X_train):
 
-            #compute validation loss using the updated weights
-            per_obs_loss_val.append(self._loss_dict[self._loss_func](y_val, self.predict(X_val)))
+                #predict from the current observation
+                fpass = self.forward(xtr)
+                #calculate the training loss
+                per_obs_loss_train.append(self._loss_dict[self._loss_func](y_train[i], fpass[0]))
 
-            #when the batch is done, update the parameters and reset the list of grad_dicts used to update them
-            if i!= 0 and i%self._batch_size == 0:
-                for grad_dict in grad_dicts:
-                    self._update_params(grad_dict)
-                grad_dicts = []
+                #calculate the gradient and update the weights
+                grad_dicts.append(self.backprop(y_train[i], fpass[0], fpass[1]))
 
+                #compute validation loss using the updated weights
+                per_obs_loss_val.append(self._loss_dict[self._loss_func](y_val, self.predict(X_val)))
 
+                #when the batch is done, update the parameters and reset the list of grad_dicts used to update them
+                if i != 0 and i % self._batch_size == 0:
+                    for grad_dict in grad_dicts:
+                        self._update_params(grad_dict)
+                    grad_dicts = []
 
-        return (np.array(per_obs_loss_train).flatten(), np.array(per_obs_loss_val).flatten())
+            per_epoch_loss_train.append(np.mean(per_obs_loss_train))
+            per_epoch_loss_val.append(np.mean(per_obs_loss_val))
+
+        print(per_epoch_loss_train)
+
+        return (per_epoch_loss_train, per_epoch_loss_val)
 
 
     def predict(self, X: ArrayLike) -> ArrayLike:
@@ -587,7 +593,7 @@ fit = test_nn.fit(x_train, y_train, x_val, y_val)
 #print(test_nn._param_dict["b2"])
 
 #plot validation loss
-plt.plot([i for i in range(len(x_train))], fit[1])
+plt.plot([i for i in range(len(fit[1]))], fit[1])
 plt.show()
 
 plt.scatter(x_val[:,0], x_val[:,1], c=y_val)
