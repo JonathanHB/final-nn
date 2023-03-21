@@ -8,4 +8,4 @@ authors = [{name = "Jonathan Borowsky", email = "jonathan.borowsky@ucsf.edu"}]
 license = {file = "LICENSE"}
 classifiers = ["License :: OSI Approved :: MIT License"]
 dynamic = ["version", "description"]
-dependencies = ["pytest", "numpy", "typing"]
+dependencies = ["pytest", "numpy", "typing", "matplotlib", "scikit-learn"]

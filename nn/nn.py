@@ -636,8 +636,8 @@ if run_internal_nn_test:
 
 if run_internal_nn_test:
 
-    import warnings
-    warnings.filterwarnings("ignore")
+    #import warnings
+    #warnings.filterwarnings("ignore")
 
     #----------------------------------------------
     # generate data
