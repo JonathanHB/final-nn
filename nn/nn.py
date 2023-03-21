@@ -158,10 +158,14 @@ class NeuralNetwork:
             single_layer_pass = self._single_forward(self._param_dict["W"+str(layer)], self._param_dict["b"+str(layer)], last_output, self.arch[idx]['activation'])
             #store the output of the current layer to be fed into the next layer
             last_output = single_layer_pass[0]
+            #print(single_layer_pass[0].shape)
             #add entries to the dictionary; used in backpropagation
             cache["A" + str(layer)] = single_layer_pass[0]
             cache["Z" + str(layer)] = single_layer_pass[1]
 
+        #print(f"forward pass output: {last_output.shape}")
+        # import sys
+        # sys.exit(0)
         return (last_output, cache)
 
 
@@ -206,11 +210,21 @@ class NeuralNetwork:
         #dimensions of len(z) (1d vector)
         #this equals the derivative of L with respect to the constants b (dL/db) since dZ/db = 1
         #'np.array' is used to convert from a list of 1-element arrays to one array
-        dLdZ = np.array(self._activation_backprop_dict[activation_curr](dA_curr, np.transpose(Z_curr)))
 
-        #derivative of the loss function with respect to the input A_in
+        # print("shapes")
+        # print(dA_curr.shape)
+        # print(Z_curr.shape)
+
+        dLdZ = self._activation_backprop_dict[activation_curr](dA_curr, np.transpose(Z_curr))
+
+        #print(dLdZ.shape)
+        #print(W_curr.shape)
+
+        #derivative of the loss function with respect to this neuron's input A_in (input as in during forward propagation)
         #dimensions of len(A_in) (1d vector)
         dLdA_in = np.matmul(np.transpose(W_curr), dLdZ)
+
+        # print(dLdA_in.shape)
 
         #mathematically I believe this should use the transpose of dL/dZ, but it comes pre-transposed here due to quirks
         # of how my numpy matrices are oriented
@@ -249,7 +263,15 @@ class NeuralNetwork:
         # this is the initial derivative from which backpropagation begins
         #This subsequently stores the derivative of the loss with respect to the input of each layer,
         # which is equal to the derivative of the loss with respect to the output of the layer above
-        dLdA_out = self._loss_backprop_dict[self._loss_func](y, y_hat)
+
+        # print("ys")
+        # print(y.shape)
+        # print(y_hat.shape)
+
+        dLdA_out = np.transpose(self._loss_backprop_dict[self._loss_func](y, y_hat))
+
+        # print(dLdA_out)
+        # print(dLdA_out.shape)
 
         for idx in range(nlayers):
             invidx = nlayers-idx-1
@@ -262,8 +284,11 @@ class NeuralNetwork:
                 dA_curr = dLdA_out,
                 activation_curr = self.arch[invidx]["activation"])
 
-            grad_dict["dW"+str(invidx+1)] = backprop_s[1]
-            grad_dict["db"+str(invidx+1)] = backprop_s[2]
+            # print(backprop_s[1])
+            # print(backprop_s[0])
+
+            grad_dict["dW"+str(invidx+1)] = np.array(backprop_s[1])
+            grad_dict["db"+str(invidx+1)] = np.array(backprop_s[2])
 
             dLdA_out = backprop_s[0]
 
@@ -284,6 +309,7 @@ class NeuralNetwork:
         for idx0 in range(len(self.arch)):
             idx = idx0+1
             self._param_dict["W"+str(idx)] -= grad_dict["dW"+str(idx)]*self._lr
+
             self._param_dict["b"+str(idx)] -= grad_dict["db"+str(idx)]*self._lr
 
 
@@ -322,6 +348,8 @@ class NeuralNetwork:
         #loop over all the epochs
         for epochx in range(self._epochs):
 
+            print(f"epoch: {epochx}")
+
             # training and validation losses for each observation
             per_obs_loss_train = []
             per_obs_loss_val = []
@@ -331,17 +359,23 @@ class NeuralNetwork:
 
             #loop over all training examples
             for i, xtr in enumerate(X_train):
-
+                #print(f"x_train element: {xtr}")
                 #predict from the current observation
                 fpass = self.forward(xtr)
                 #calculate the training loss
-                per_obs_loss_train.append(self._loss_dict[self._loss_func](y_train[i], fpass[0]))
+                #print(f"fpass[0].shape =  {fpass[0][0].shape}")
+
+                train_i_2 = np.reshape(y_train[i], (1,len(y_train[i])))
+                #print(train_i_2.shape)
+
+                per_obs_loss_train.append(self._loss_dict[self._loss_func](train_i_2, fpass[0]))
 
                 #calculate the gradient and update the weights
-                grad_dicts.append(self.backprop(y_train[i], fpass[0], fpass[1]))
+                grad_dicts.append(self.backprop(train_i_2, fpass[0], fpass[1]))
 
                 #compute validation loss using the updated weights
                 per_obs_loss_val.append(self._loss_dict[self._loss_func](y_val, self.predict(X_val)))
+                #per_obs_loss_val += [self._loss_dict[self._loss_func](y_val[obs_i], self.predict(X_val[obs_i])) for obs_i in range(len(X_val))]
 
                 #when the batch is done, update the parameters and reset the list of grad_dicts used to update them
                 if i != 0 and i % self._batch_size == 0:
@@ -349,10 +383,13 @@ class NeuralNetwork:
                         self._update_params(grad_dict)
                     grad_dicts = []
 
-            per_epoch_loss_train.append(np.mean(per_obs_loss_train))
-            per_epoch_loss_val.append(np.mean(per_obs_loss_val))
+                import sys
+                #sys.exit(0)
 
-        print(per_epoch_loss_train)
+            per_epoch_loss_train.append(np.nanmean(per_obs_loss_train))
+            per_epoch_loss_val.append(np.nanmean(per_obs_loss_val))
+
+        #print(per_epoch_loss_train)
 
         return (per_epoch_loss_train, per_epoch_loss_val)
 
@@ -456,10 +493,21 @@ class NeuralNetwork:
             loss: float
                 Average loss over mini-batch.
         """
-        n = y.shape[0]
+        n_obs = y_hat.shape[0]
+        n_feat = y_hat.shape[1]
+
+        #print("bce-debug")
+        #print(f"y shape: {y.shape}")
+        #print(f"y_hat shape: {y_hat.shape}")
 
         # compute the binary cross entropy loss function. First term is added for true observations, second term is added for false ones.
-        bce_loss = -sum([y[x] * np.log(y_hat[x]) + (1 - y[x]) * (np.log(1 - y_hat[x])) for x in range(n)]) / n
+        bce_loss = [-sum([y[i_obs][x] * np.log(y_hat[i_obs][x]) + (1 - y[i_obs][x]) * (np.log(1 - y_hat[i_obs][x]))
+                          if (y_hat[i_obs][x] != 1 and y_hat[i_obs][x] != 0)
+                          else np.sign(y_hat[i_obs][x] - y[i_obs][x]) * (10 ** 6)
+                          for x in range(n_feat)]) / n_feat for i_obs in range(n_obs)]
+        #print(f"bce_loss: {bce_loss}")
+        #import sys
+        #sys.exit(0)
         return bce_loss
 
     def _binary_cross_entropy_backprop(self, y: ArrayLike, y_hat: ArrayLike) -> ArrayLike:
@@ -476,11 +524,18 @@ class NeuralNetwork:
             dA: ArrayLike
                 partial derivative of loss with respect to y_hat.
         """
+
+        # print("bce-debug")
+        # print(f"y shape: {y.shape}")
+        # print(f"y_hat shape: {y_hat.shape}")
+
         #Note that this is the bce loss derivative with respect to y_hat,
         # not with respect to the weights W used to calculate y_hat.
         #Beware that these may be very large where y_hat is near 0 or 1.
         # As far as I can tell this is a natural property of the BCE function.
-        return [(y_hat[i] - y[i])/(y_hat[i]*(1 - y_hat[i])) for i in range(len(y))]
+        return [[(y_hat[i_obs][i] - y[i_obs][i])/(y_hat[i_obs][i]*(1 - y_hat[i_obs][i])) if (y_hat[i_obs][i] != 1 and y_hat[i_obs][i] != 0)
+                 else np.sign(y_hat[i_obs][i] - y[i_obs][i])*(10**6)
+                 for i in range(y_hat.shape[1])] for i_obs in range(y_hat.shape[0])]
 
     def _mean_squared_error(self, y: ArrayLike, y_hat: ArrayLike) -> float:
         """
@@ -496,8 +551,10 @@ class NeuralNetwork:
             loss: float
                 Average loss of mini-batch.
         """
-        n = len(y)
-        return np.sum([(y_hat[i]-y[i])**2 for i in range(n)])/n
+
+        return [np.sum([(y_hat[i_obs][i]-y[i_obs][i])**2
+                for i in range(y_hat.shape[1])])/y_hat.shape[1]
+                for i_obs in range(y_hat.shape[0])]
 
     def _mean_squared_error_backprop(self, y: ArrayLike, y_hat: ArrayLike) -> ArrayLike:
         """
@@ -513,19 +570,71 @@ class NeuralNetwork:
             dA: ArrayLike
                 partial derivative of loss with respect to A matrix.
         """
-        n = len(y)
-        return [2*(y_hat[i] - y[i]) for i in range(n)]
+
+        return [[2*(y_hat[i_obs][i] - y[i_obs][i])
+                for i in range(y_hat.shape[1])]
+                for i_obs in range(y_hat.shape[0])]
 
 
 #---------------------------------------------------------------------------
 #--------------------------------  testing  --------------------------------
 #---------------------------------------------------------------------------
 
+import matplotlib.pyplot as plt
+
 run_internal_nn_test = False
+
+if not run_internal_nn_test:
+
+    import sklearn.datasets
+    digits = sklearn.datasets.load_digits()
+
+    #initialize neural network
+    test_nn = NeuralNetwork(
+        [{'input_dim': 64, 'output_dim': 16, 'activation': 'relu'}, {'input_dim': 16, 'output_dim': 16, 'activation': 'relu'}, {'input_dim': 16, 'output_dim': 64, 'activation': 'relu'}],
+        lr=.00005,
+        seed=0,
+        batch_size=1,
+        epochs=10,
+        loss_function="mse" #do not use bce here; it is not numerically stable
+        )
+
+    n_train = 200
+    n_val = 50
+
+    digit_data = digits.data
+    np.random.shuffle(digit_data)
+
+    train = digit_data[0:n_train]
+    val = digit_data[n_train:n_train+n_val]
+
+    # print(val[0])
+    # print(np.reshape(val[0], (8,8)))
+
+    fit = test_nn.fit(train, train, val, val)
+
+    #validation loss
+    plt.plot([i for i in range(len(fit[1]))], fit[1])
+    plt.show()
+
+    #training loss
+    #plt.plot([i for i in range(len(fit[0]))], fit[0])
+    #plt.show()
+
+    val_mat = np.reshape(val[0], (8,8))
+
+    plt.gray()
+    plt.matshow(val_mat)
+    plt.show()
+
+    pred_mat = np.reshape(test_nn.predict(val[0]), (8,8))
+
+    plt.matshow(pred_mat)
+    plt.show()
+
 
 if run_internal_nn_test:
 
-    import matplotlib.pyplot as plt
     import warnings
     warnings.filterwarnings("ignore")
 
