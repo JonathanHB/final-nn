@@ -499,11 +499,11 @@ class NeuralNetwork:
         #print("bce-debug")
         #print(f"y shape: {y.shape}")
         #print(f"y_hat shape: {y_hat.shape}")
+        #if (y_hat[i_obs][x] != 1 and y_hat[i_obs][x] != 0)
+        #else -(10 ** 6)
 
         # compute the binary cross entropy loss function. First term is added for true observations, second term is added for false ones.
         bce_loss = [-sum([y[i_obs][x] * np.log(y_hat[i_obs][x]) + (1 - y[i_obs][x]) * (np.log(1 - y_hat[i_obs][x]))
-                          if (y_hat[i_obs][x] != 1 and y_hat[i_obs][x] != 0)
-                          else np.sign(y_hat[i_obs][x] - y[i_obs][x]) * (10 ** 6)
                           for x in range(n_feat)]) / n_feat for i_obs in range(n_obs)]
         #print(f"bce_loss: {bce_loss}")
         #import sys
@@ -533,6 +533,7 @@ class NeuralNetwork:
         # not with respect to the weights W used to calculate y_hat.
         #Beware that these may be very large where y_hat is near 0 or 1.
         # As far as I can tell this is a natural property of the BCE function.
+        #the behavior of np.sign causes indeterminate forms to yield a zero gradient, which is the correct behavior
         return [[(y_hat[i_obs][i] - y[i_obs][i])/(y_hat[i_obs][i]*(1 - y_hat[i_obs][i])) if (y_hat[i_obs][i] != 1 and y_hat[i_obs][i] != 0)
                  else np.sign(y_hat[i_obs][i] - y[i_obs][i])*(10**6)
                  for i in range(y_hat.shape[1])] for i_obs in range(y_hat.shape[0])]
@@ -584,7 +585,7 @@ import matplotlib.pyplot as plt
 
 run_internal_nn_test = False
 
-if not run_internal_nn_test:
+if run_internal_nn_test:
 
     import sklearn.datasets
     digits = sklearn.datasets.load_digits()

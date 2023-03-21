@@ -52,14 +52,6 @@ def sample_seqs(seqs: List[str], labels: List[bool]) -> Tuple[List[str], List[bo
     return ([i[0] for i in seqs_labels_out], [i[1] for i in seqs_labels_out])
 
 
-test_sample_seqs = False
-
-if test_sample_seqs:
-    test_str = ["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p"]
-    test_labels = [True, False, True, False, True, False, False, False, True, False, True, False, False, False, False, False]
-    print(sample_seqs(test_str, test_labels))
-
-
 def one_hot_encode_seqs(seq_arr: List[str]) -> ArrayLike:
     """
     This function generates a flattened one-hot encoding of a list of DNA sequences
