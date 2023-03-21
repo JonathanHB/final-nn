@@ -1,6 +1,8 @@
 # DO NOT MODIFY ANY OF THESE FUNCTIONS
 # THEY ARE ALREADY COMPLETE!
 
+#renamed because jupyter kept importing the python io module instead
+
 # Imports
 from typing import List
 
@@ -16,6 +18,7 @@ def read_text_file(filename: str) -> List[str]:
         seqs: List[str]
             List of sequences.
     """
+    print(filename)
     with open(filename, "r") as f:
         seqs = [line.strip() for line in f.readlines()]
     return seqs

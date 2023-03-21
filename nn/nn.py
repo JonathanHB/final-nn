@@ -410,6 +410,7 @@ class NeuralNetwork:
         #return the output of one forward pass through the network
         return self.forward(X)[0]
 
+
     def _sigmoid(self, Z: ArrayLike) -> ArrayLike:
         """
         Sigmoid activation function.
@@ -425,7 +426,6 @@ class NeuralNetwork:
         #using a logistic sigmoid function
         #the logistic function is applied elementwise to z
         return [1/(1+np.exp(-i)) for i in Z]
-
 
     def _sigmoid_backprop(self, dA: ArrayLike, Z: ArrayLike):
         """
